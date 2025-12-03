@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Requests Tracker</title>
+
+<style>
+    body {
+        font-family: Arial, sans-serif;
+        background: #fff;
+        margin: 0;
+        padding: 0;
+    }
+
+    h1 {
+        background: #1E90FF;
+        color: white;
+        padding: 25px 40px;
+        margin: 0;
+        font-size: 48px;
+    }
+	
+	#filters
+	{
+        display: flex;
+        gap: 30px;
+        padding: 40px;
+        justify-content: center;
+    }
+
+    .board {
+        display: flex;
+        gap: 30px;
+        padding: 40px;
+        justify-content: center;
+    }
+
+    .column {
+        width: 22%;
+        border: 3px solid rgba(0,0,0,0.1);
+        border-radius: 6px;
+        padding-bottom: 20px;
+        min-height: 400px;
+    }
+
+    .column-header {
+        color: white;
+        font-weight: bold;
+        text-align: center;
+        padding: 15px;
+        font-size: 20px;
+    }
+
+    .todo-header { background: #1E90FF; }
+    .progress-header { background: #F4A300; }
+    .done-header { background: #9B6EFF; }
+
+    .column-content {
+        padding: 20px;
+    }
+
+    .card {
+        padding: 20px;
+        margin-bottom: 20px;
+        border-radius: 6px;
+        color: black;
+        font-size: 14px;
+        cursor: pointer;
+    }
+
+    .card.nuova { background: #1E90FF; }
+    .card.in_lavorazione { background: #F4A300; }
+    .card.chiusa { background: #9B6EFF; }
+
+    /* Modal */
+    #modal {
+        position: fixed;
+        left: 0; top: 0;
+        width: 100%; height: 100%;
+        background: rgba(0,0,0,0.5);
+        display: none;
+        justify-content: center;
+        align-items: center;
+    }
+
+    #modal-content {
+        background: white;
+        padding: 30px;
+        border-radius: 8px;
+        width: 500px;
+    }
+</style>
+
+</head>
+<body>
+
+<h1>Requests Tracker</h1>
+
+<div style="padding:20px 40px;">
+    <button onclick="openCreateModal()" style="padding:10px 20px; font-size:16px;">
+        Nuova richiesta
+    </button>
+	<button style="margin-left:20px;padding:10px 20px; font-size:16px;float:right" onclick="downloadCSV()">Download CSV</button>
+</div>
+
+
+<div id="filters" style="padding: 20px 40px; background:#f5f5f5; border-bottom:1px solid #ddd;">
+    <h3>Filtri</h3>
+
+    <label>Tag:</label>
+    <input type="text" id="f-tag" placeholder="es. magazzino">
+
+    <label style="margin-left:20px;">Assegnato a:</label>
+    <input type="text" id="f-assignee" placeholder="Mario">
+
+    <br><br>
+
+    <label>Creata dal:</label>
+    <input type="date" id="f-date-from">
+
+    <label style="margin-left:20px;">Creata al:</label>
+    <input type="date" id="f-date-to">
+
+    <button style="margin-left:30px;" onclick="applyFilters()">Applica</button>
+    <button onclick="resetFilters()">Reset</button>
+</div>
+
+
+
+<div class="board">
+
+    <div class="column" id="todo-col">
+        <div class="column-header todo-header">NUOVA</div>
+        <div class="column-content"></div>
+    </div>
+
+    <div class="column" id="progress-col">
+        <div class="column-header progress-header">IN LAVORAZIONE</div>
+        <div class="column-content"></div>
+    </div>
+
+    <div class="column" id="done-col">
+        <div class="column-header done-header">CHIUSA</div>
+        <div class="column-content"></div>
+    </div>
+
+</div>
+
+<!-- Modal -->
+<div id="modal">
+    <div id="modal-content">
+
+        <h2>Richiesta</h2>
+
+        <label>Titolo</label>
+        <input id="m-title" type="text" style="width:100%; margin-bottom:10px;">
+
+        <label>Descrizione</label>
+        <textarea id="m-description" style="width:100%; height:90px; margin-bottom:10px;"></textarea>
+		
+		Data creazione</br><span id="m-datacreazione"></span></br></br>
+		Data modifica</br><span id="m-datamodifica"></span></br></br>
+
+        <label>Status</label>
+        <select id="m-status" style="width:100%; margin-bottom:10px;">
+            <option value="nuova">Nuova</option>
+            <option value="in_lavorazione">In Lavorazione</option>
+            <option value="chiusa">Chiusa</option>
+        </select>
+
+        <label>Priorità</label>
+        <select id="m-priority" style="width:100%; margin-bottom:10px;">
+            <option value="bassa">Bassa</option>
+            <option value="media">Media</option>
+            <option value="alta">Alta</option>
+            <option value="bloccante">Bloccante</option>
+        </select>
+
+        <label>Assegnato a</label>
+        <input id="m-assignee" type="text" style="width:100%; margin-bottom:10px;">
+
+        <label>Tags (comma separated)</label>
+        <input id="m-tags" type="text" style="width:100%; margin-bottom:20px;">
+
+        <button onclick="saveCard()">Salva</button>
+        <button onclick="closeModal()">Chiudi</button>
+		<button onclick="deleteRequest()">Cancella</button>
+    </div>
+</div>
+
+<!-- Create Modal -->
+<div id="create-modal" style="
+    position: fixed;
+    left: 0; top: 0; width: 100%; height: 100%;
+    background: rgba(0,0,0,0.5);
+    display: none; justify-content: center; align-items: center;
+">
+    <div style="background:white; padding:30px; border-radius:8px; width:500px;">
+        <h2>Crea Nuova Richiesta</h2>
+
+        <label>Titolo</label>
+        <input id="c-title" type="text" style="width:100%; margin-bottom:10px;">
+
+        <label>Descrizione</label>
+        <textarea id="c-description" style="width:100%; height:90px; margin-bottom:10px;"></textarea>
+
+        <label>Status</label>
+        <select id="c-status" style="width:100%; margin-bottom:10px;">
+            <option value="nuova">Nuova</option>
+            <option value="in_lavorazione">In Lavorazione</option>
+            <option value="chiusa">Chiusa</option>
+        </select>
+
+        <label>Priorità</label>
+		<select id="c-priority" style="width:100%; margin-bottom:10px;">
+            <option value="bassa">Bassa</option>
+            <option value="media">Media</option>
+            <option value="alta">Alta</option>
+            <option value="bloccante">Bloccante</option>
+        </select>
+
+        <label>Assegnato a</label>
+        <input id="c-assignee" type="text" style="width:100%; margin-bottom:10px;">
+
+        <label>Tags (comma separated)</label>
+        <input id="c-tags" type="text" style="width:100%; margin-bottom:20px;">
+
+        <button onclick="createRequest()">Crea</button>
+        <button onclick="closeCreateModal()">Annulla</button>
+    </div>
+</div>
+
+
+
+
+<script>
+
+let currentEditingID = null;
+let currentEditingStatus = null;
+
+let allRequests = [];     
+let currentFilters = {};
+let currentRequests = [];
+
+function loadBoard() {
+    fetch("/api/v1/requests")
+        .then(r => r.json())
+        .then(data => {
+            allRequests = data;   
+            renderBoard(data);   
+        });
+}
+
+
+function renderBoard(requests) {
+    let todo = document.querySelector("#todo-col .column-content");
+    let prog = document.querySelector("#progress-col .column-content");
+    let done = document.querySelector("#done-col .column-content");
+
+    todo.innerHTML = "";
+    prog.innerHTML = "";
+    done.innerHTML = "";
+
+    requests.forEach(item => {
+        let el = document.createElement("div");
+        el.className = "card " + (item.status === "in_lavorazione" ? "in_lavorazione" : item.status);
+        el.innerText = item.title;
+        el.onclick = () => openModal(item.id);
+
+        if (item.status === "nuova") todo.appendChild(el);
+        else if (item.status === "in_lavorazione") prog.appendChild(el);
+        else done.appendChild(el);
+    });
+}
+
+function applyFilters() {
+    let tag = document.getElementById("f-tag").value.toLowerCase().trim();
+    let assignee = document.getElementById("f-assignee").value.toLowerCase().trim();
+    let dateFrom = document.getElementById("f-date-from").value;
+    let dateTo = document.getElementById("f-date-to").value;
+
+    currentRequests = allRequests.filter(r => {
+        // FILTRO TAG
+        if (tag && (!r.tags || !r.tags.toLowerCase().includes(tag))) return false;
+
+        // FILTRO ASSEGNATARIO
+        if (assignee && (!r.assignee || !r.assignee.toLowerCase().includes(assignee))) return false;
+
+        // FILTRO DATA MINIMA
+        if (dateFrom && r.created_at < dateFrom) return false;
+
+        // FILTRO DATA MASSIMA
+        if (dateTo && r.created_at > dateTo) return false;
+
+        return true;
+    });
+
+    renderBoard(currentRequests);
+}
+
+
+function resetFilters() {
+    document.getElementById("f-tag").value = "";
+    document.getElementById("f-assignee").value = "";
+    document.getElementById("f-date-from").value = "";
+    document.getElementById("f-date-to").value = "";
+	currentRequests = allRequests;
+    renderBoard(allRequests);
+}
+
+
+
+function openModal(id) {
+    currentEditingID = id;
+
+    fetch("/api/v1/request/" + id)
+        .then(r => r.json())
+        .then(data => {
+            document.getElementById("m-title").value = data.title;
+            document.getElementById("m-description").value = data.description;
+            document.getElementById("m-status").value = data.status;
+            document.getElementById("m-priority").value = data.priority;
+            document.getElementById("m-assignee").value = data.assignee;
+            document.getElementById("m-tags").value = data.tags;
+			document.getElementById("m-datacreazione").innerHTML = " " + data.created_at;
+			document.getElementById("m-datamodifica").innerHTML = " " + data.updated_at;
+            document.getElementById("modal").style.display = "flex";
+			currentEditingStatus = data.status;
+			
+        });
+	
+}
+
+function saveCard() {
+	
+	if (currentEditingStatus === 'chiusa' && document.getElementById("m-status").value !== 'chiusa') {
+		document.getElementById("m-status").value = 'chiusa';
+	}
+	
+    let payload = {
+        title: document.getElementById("m-title").value,
+        description: document.getElementById("m-description").value,
+        status: document.getElementById("m-status").value,
+        priority: document.getElementById("m-priority").value,
+        assignee: document.getElementById("m-assignee").value,
+        tags: document.getElementById("m-tags").value
+    };
+	
+
+    fetch("/api/v1/requests/" + currentEditingID, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+    })
+    .then(r => r.json())
+    .then(resp => {
+        if (resp.success) {
+            closeModal();
+            loadBoard();  
+        }
+    });
+}
+
+function closeModal() {
+    document.getElementById("modal").style.display = "none";
+}
+
+function openCreateModal() {
+    document.getElementById("create-modal").style.display = "flex";
+}
+
+function closeCreateModal() {
+    document.getElementById("create-modal").style.display = "none";
+    document.getElementById("c-title").value = "";
+    document.getElementById("c-description").value = "";
+    document.getElementById("c-status").value = "nuova";
+    document.getElementById("c-priority").value = "";
+    document.getElementById("c-assignee").value = "";
+    document.getElementById("c-tags").value = "";
+}
+
+function createRequest() {
+    let payload = {
+        title: document.getElementById("c-title").value,
+        description: document.getElementById("c-description").value,
+        status: document.getElementById("c-status").value,
+        priority: document.getElementById("c-priority").value,
+        assignee: document.getElementById("c-assignee").value,
+        tags: document.getElementById("c-tags").value
+    };
+
+    fetch("/api/v1/request", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+    })
+    .then(r => r.json())
+    .then(resp => {
+        if (resp.success) {
+            closeCreateModal();
+            loadBoard();   
+        }
+    });
+}
+
+
+function deleteRequest(){
+
+	fetch("/api/v1/delete/" + currentEditingID, {
+        method: "GET",
+        headers: { "Content-Type": "application/json" }
+    })
+    .then(r => r.json())
+    .then(resp => {
+        if (resp.success) {
+            closeModal();
+            loadBoard();   
+        }
+    });
+}
+
+
+function downloadCSV() {
+    fetch("/api/export_csv", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(currentRequests)
+    })
+    .then(response => response.blob())
+    .then(blob => {
+        let url = window.URL.createObjectURL(blob);
+        let a = document.createElement("a");
+        a.href = url;
+        a.download = "requests_report.csv";
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+    });
+}
+
+
+loadBoard();
+</script>
+
+</body>
+</html>
